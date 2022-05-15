@@ -1,3 +1,17 @@
+use rayon::prelude::*;
+use std::collections::HashMap;
+
+lazy_static::lazy_static! {
+    static ref REPLACEMENTS: HashMap<&'static str, &'static str> = {
+        vec![
+            ("mr", "mister"),
+            ("mrs", "miss"),
+            ("phd", "doctor"),
+            ("bsc", "bachelor"),
+        ].into_iter().collect()
+    };
+}
+
 #[derive(Debug)]
 pub enum PunctuationKind {
     Stop,
@@ -25,7 +39,25 @@ pub enum Token<'i> {
     WordPosessive { raw: &'i str, fixed: String },
     Punctuation(PunctuationKind),
     Whitespace,
+    Replaced { raw: &'i str, fixed: &'static str },
     Unknown(char),
+}
+
+fn check(raw: &str) -> Option<Token> {
+    REPLACEMENTS
+        .get(raw)
+        .map(|t| Token::Replaced { raw, fixed: t })
+}
+
+pub fn replace(tokens: Vec<Token>) -> Vec<Token> {
+    tokens
+        .into_par_iter()
+        .map(|token| match token {
+            Token::Word(raw) => check(raw).unwrap_or(token),
+            Token::WordPosessive { raw, fixed: _ } => check(raw).unwrap_or(token),
+            _ => token,
+        })
+        .collect()
 }
 
 pub mod parsers {
