@@ -1,3 +1,4 @@
+pub use parsers::tokens;
 use rayon::prelude::*;
 use std::collections::HashMap;
 
@@ -18,7 +19,7 @@ pub enum PunctuationKind {
     Comma,
     Exclamation,
     Question,
-    Unknown,
+    Unknown(char),
 }
 
 impl From<char> for PunctuationKind {
@@ -28,7 +29,19 @@ impl From<char> for PunctuationKind {
             ',' => PunctuationKind::Comma,
             '!' => PunctuationKind::Exclamation,
             '?' => PunctuationKind::Question,
-            _ => PunctuationKind::Unknown,
+            c => PunctuationKind::Unknown(c),
+        }
+    }
+}
+
+impl From<PunctuationKind> for char {
+    fn from(raw: PunctuationKind) -> Self {
+        match raw {
+            PunctuationKind::Stop => '.',
+            PunctuationKind::Comma => ',',
+            PunctuationKind::Exclamation => '!',
+            PunctuationKind::Question => '?',
+            PunctuationKind::Unknown(c) => c,
         }
     }
 }
@@ -41,6 +54,21 @@ pub enum Token<'i> {
     Whitespace,
     Replaced { raw: &'i str, fixed: &'static str },
     Unknown(char),
+}
+
+pub fn to_string(tokens: Vec<Token>) -> String {
+    let mut s = String::new();
+    for token in tokens {
+        match token {
+            Token::Word(word) => s.push_str(word),
+            Token::WordPosessive { raw: _, fixed } => s.push_str(&fixed),
+            Token::Punctuation(kind) => s.push_str(&char::from(kind).to_string()),
+            Token::Whitespace => s.push(' '),
+            Token::Replaced { raw: _, fixed } => s.push_str(&fixed),
+            Token::Unknown(c) => s.push(c),
+        }
+    }
+    s
 }
 
 fn check(raw: &str) -> Option<Token> {
@@ -80,19 +108,19 @@ pub mod parsers {
         })(input)
     }
 
-    pub fn word(input: &str) -> IResult<&str, Token> {
+    fn word(input: &str) -> IResult<&str, Token> {
         map(terminated(alpha1, not(tag("'"))), Token::Word)(input)
     }
 
-    pub fn whitespace(input: &str) -> IResult<&str, Token> {
+    fn whitespace(input: &str) -> IResult<&str, Token> {
         map(space1, |_| Token::Whitespace)(input)
     }
 
-    pub fn punctuation(input: &str) -> IResult<&str, Token> {
+    fn punctuation(input: &str) -> IResult<&str, Token> {
         map(one_of("?,!."), |c| Token::Punctuation(c.into()))(input)
     }
 
-    pub fn token(input: &str) -> IResult<&str, Token> {
+    fn token(input: &str) -> IResult<&str, Token> {
         alt((
             word,
             possessive,

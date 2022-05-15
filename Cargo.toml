@@ -9,3 +9,9 @@ edition = "2021"
 nom = "7.1.1"
 lazy_static = "1.4.0"
 rayon = "1.5.3"
+
+
+[workspace]
+members = [
+    "bindings/python",
+]
